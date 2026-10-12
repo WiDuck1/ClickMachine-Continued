@@ -5,26 +5,25 @@ import java.util.List;
 
 import dev.shadowsoffire.clickmachine.ClickMachine;
 import dev.shadowsoffire.clickmachine.ClickMachineConfig;
-import dev.shadowsoffire.placebo.menu.IDataUpdateListener;
-import dev.shadowsoffire.placebo.screen.PlaceboContainerScreen;
-import dev.shadowsoffire.placebo.util.ClientUtil;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.input.MouseButtonEvent;
+import java.util.Optional;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 
-public class ClickMachineScreen extends PlaceboContainerScreen<ClickMachineMenu> implements IDataUpdateListener {
+public class ClickMachineScreen extends AbstractContainerScreen<ClickMachineMenu> {
 
-    public static final ResourceLocation GUI_TEXTURE = ClickMachine.loc("textures/gui/auto_click.png");
+    public static final Identifier GUI_TEXTURE = ClickMachine.loc("textures/gui/auto_click.png");
     protected Player player = Minecraft.getInstance().player;
     protected SpeedSlider slider;
 
     public ClickMachineScreen(ClickMachineMenu container, Inventory inv, Component name) {
-        super(container, inv, name);
-        this.imageWidth = 176;
-        this.imageHeight = 196;
+        super(container, inv, name, 176, 196);
     }
 
     @Override
@@ -35,53 +34,55 @@ public class ClickMachineScreen extends PlaceboContainerScreen<ClickMachineMenu>
         this.slider = this.addRenderableWidget(new SpeedSlider(this, x, y, 100, 20));
         this.addRenderableWidget(new ClickerCheckboxButton(this, x, y + 22, 20, 20, Component.translatable("gui.clickmachine.sneaking"), 3, this.menu::isSneaking));
         this.addRenderableWidget(new ClickerCheckboxButton(this, x, y + 44, 20, 20, Component.translatable("gui.clickmachine.right_click"), 4, this.menu::isRightClicking));
-        this.menu.addDataListener(this);
+        this.menu.setSpeedListener(this.slider::setValue);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        return this.getFocused() != null && this.isDragging() && button == 0 ? this.getFocused().mouseDragged(mouseX, mouseY, button, dragX, dragY) : super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        return this.getFocused() != null && this.isDragging() && event.button() == 0
+            ? this.getFocused().mouseDragged(event, dragX, dragY) : super.mouseDragged(event, dragX, dragY);
     }
 
     @Override
-    protected void renderLabels(GuiGraphics gfx, int mouseX, int mouseY) {
-        gfx.drawString(font, this.getNarrationMessage(), 8, 6, 4210752, false);
-        gfx.drawString(font, this.player.getInventory().getDisplayName().getString(), 8, this.imageHeight - 96 + 2, 4210752, false);
+    protected void extractLabels(GuiGraphicsExtractor gfx, int mouseX, int mouseY) {
+        gfx.text(font, this.getNarrationMessage(), 8, 6, 0xFF404040, false);
+        gfx.text(font, this.playerInventoryTitle, 8, this.imageHeight - 96 + 2, 0xFF404040, false);
     }
 
     @Override
-    protected void renderBg(GuiGraphics gfx, float partialTicks, int mouseX, int mouseY) {
+    public void extractBackground(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTicks) {
+        super.extractBackground(gfx, mouseX, mouseY, partialTicks);
         int i = (this.width - this.imageWidth) / 2;
         int j = (this.height - this.imageHeight) / 2;
-        gfx.blit(GUI_TEXTURE, i, j, 0, 0, this.imageWidth, this.imageHeight);
+        gfx.blit(RenderPipelines.GUI_TEXTURED, GUI_TEXTURE, i, j, 0, 0, this.imageWidth, this.imageHeight, 256, 256);
         int x = i + 150;
         int y = j + 26;
-        gfx.blit(GUI_TEXTURE, x, y, this.imageWidth + 21, 0, 21, 64);
+        gfx.blit(RenderPipelines.GUI_TEXTURED, GUI_TEXTURE, x, y, this.imageWidth + 21, 0, 21, 64, 256, 256);
         if (ClickMachineConfig.usesRF) {
             int maxP = ClickMachineConfig.maxPowerStorage;
             double p = this.menu.getEnergy();
-            double ratio = p / maxP;
-            gfx.blit(GUI_TEXTURE, x, y, this.imageWidth, 0, 21, 64 - (int) (ratio * 64));
+            double ratio = maxP == 0 ? 0 : p / maxP;
+            gfx.blit(RenderPipelines.GUI_TEXTURED, GUI_TEXTURE, x, y, this.imageWidth, 0, 21, 64 - (int) (ratio * 64), 256, 256);
         }
         else {
-            ClientUtil.colorBlit(gfx.pose(), x + 1, y + 1, this.imageWidth + 43, 1, 19, 62, 0xFF000000 | colors[(int) ((partialTicks + Minecraft.getInstance().player.tickCount / 0.5F) % colors.length)]);
+            gfx.blit(RenderPipelines.GUI_TEXTURED, GUI_TEXTURE, x + 1, y + 1, this.imageWidth + 43, 1, 19, 62, 256, 256, 0xFF000000 | colors[(int) ((partialTicks + Minecraft.getInstance().player.tickCount / 0.5F) % colors.length)]);
         }
     }
 
     @Override
-    protected void renderTooltip(GuiGraphics gfx, int x, int y) {
-        super.renderTooltip(gfx, x, y);
+    protected void extractTooltip(GuiGraphicsExtractor gfx, int x, int y) {
+        super.extractTooltip(gfx, x, y);
         if (this.isHovering(150, 26, 21, 64, x, y)) {
             if (ClickMachineConfig.usesRF) {
                 List<Component> comps = new ArrayList<>(2);
                 comps.add(Component.translatable("gui.clickmachine.power", this.menu.getEnergy(), ClickMachineConfig.maxPowerStorage));
                 comps.add(Component.translatable("gui.clickmachine.power.usage", ClickMachineConfig.powerPerSpeed[this.menu.getSpeedIdx()]));
-                gfx.renderComponentTooltip(font, comps, x, y);
+                gfx.setTooltipForNextFrame(font, comps, Optional.empty(), x, y);
             }
             else {
                 List<Component> comps = new ArrayList<>(1);
                 comps.add(Component.translatable("gui.clickmachine.rainbow_magic"));
-                gfx.renderComponentTooltip(font, comps, x, y);
+                gfx.setTooltipForNextFrame(font, comps, Optional.empty(), x, y);
             }
         }
     }
@@ -99,12 +100,5 @@ public class ClickMachineScreen extends PlaceboContainerScreen<ClickMachineMenu>
         0xffffb400, 0xffffba00, 0xffffbf00, 0xffffc600, 0xffffcc00, 0xffffd100, 0xffffd700, 0xffffde00, 0xffffe400, 0xffffea00, 0xffffef00, 0xfffff600, 0xfffffc00, 0xfdffff00, 0xf7ffff00, 0xf0ffff00, 0xeaffff00, 0xe4ffff00, 0xdfffff00,
         0xd8ffff00, 0xd2ffff00, 0xcdffff00, 0xc7ffff00, 0xc0ffff00, 0xbaffff00, 0xb4ffff00, 0xafffff00, 0xa8ffff00, 0xa2ffff00, 0x9dffff00, 0x97ffff00, 0x90ffff00, 0x8affff00, 0x84ffff00, 0x7fffff00, 0x78ffff00, 0x72ffff00, 0x6dffff00,
         0x67ffff00, 0x60ffff00, 0x5affff00, 0x54ffff00, 0x4fffff00, 0x48ffff00, 0x42ffff00, 0x3dffff00, 0x37ffff00, 0x30ffff00, 0x2affff00, 0x24ffff00, 0x1fffff00, 0x18ffff00, 0x12ffff00, 0xdffff00, 0x7ffff00 };
-
-    @Override
-    public void dataUpdated(int id, int value) {
-        if (id == 1) {
-            this.slider.setValue(value);
-        }
-    }
 
 }

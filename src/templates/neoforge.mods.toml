@@ -21,7 +21,7 @@ ${mixinConfig}
 [[dependencies.${modid}]]
     modId="minecraft"
     type="required"
-    versionRange="[${mcVersion},)"
+    versionRange="[${mcVersion}]"
     ordering="NONE"
     side="BOTH"
 
@@ -29,12 +29,5 @@ ${mixinConfig}
     modId="neoforge"
     type="required"
     versionRange="[${forgeVersion},)"
-    ordering="NONE"
-    side="BOTH"
-
-[[dependencies.${modid}]]
-    modId="placebo"
-    type="required"
-    versionRange="[${placeboVersion},)"
     ordering="NONE"
     side="BOTH"

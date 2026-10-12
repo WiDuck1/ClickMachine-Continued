@@ -20,6 +20,8 @@ build
 # other
 eclipse
 run
+run-26.2
+src/generated/resources/.cache/
 logs
 .factorypath
 /.apt_generated/

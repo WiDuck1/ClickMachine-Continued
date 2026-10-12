@@ -11,6 +11,6 @@ public class ClickMachineClient {
 
     @SubscribeEvent
     public static void setup(RegisterMenuScreensEvent e) {
-        e.register(ClickMachine.CLICK_MACHINE_MENU, ClickMachineScreen::new);
+        e.register(ClickMachine.CLICK_MACHINE_MENU.get(), ClickMachineScreen::new);
     }
 }

@@ -48,7 +48,7 @@ public class LootProvider extends LootTableProvider {
 
         @Override
         protected Iterable<Block> getKnownBlocks() {
-            return BuiltInRegistries.BLOCK.holders().filter(h -> h.getKey().location().getNamespace().equals(ClickMachine.MODID)).map(Holder::value).toList();
+            return BuiltInRegistries.BLOCK.listElements().filter(h -> h.getKey().identifier().getNamespace().equals(ClickMachine.MODID)).map(Holder::value).toList();
         }
 
         protected void dropSelf(Holder<Block> block) {

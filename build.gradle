@@ -1,8 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.80'
-    id 'com.diffplug.eclipse.apt' version '3.42.2'
+    id 'net.neoforged.moddev' version '2.0.148'
     id 'net.darkhax.curseforgegradle' version '1.1.18'
 }
 
@@ -12,21 +11,39 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(project.properties.javaVersion)
 
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
 // Forward declaration of generateModMetadata for use in the neoForge block. Definition is below.
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {}
+
+var prepareClientSmokeWorld = tasks.register('prepareClientSmokeWorld', Sync) {
+    dependsOn 'runGameTestServer'
+    from 'run-26.2/gametest/gametestserver/gametestworld'
+    into 'run-26.2/client-smoke/saves/Click Machine smoke'
+    exclude 'session.lock'
+    doLast {
+        def config = file('run-26.2/client-smoke/config/clickmachine.cfg')
+        config.parentFile.mkdirs()
+        def usesRF = providers.gradleProperty('smokeUsesRF').getOrElse('true')
+        config.text = file('src/main/resources/clickmachine-default.cfg').text.replace('B:"Uses RF"=false', 'B:"Uses RF"=' + usesRF)
+        file('run-26.2/client-smoke/options.txt').text = 'onboardAccessibility:false\n'
+    }
+}
 
 neoForge {
     version = project.properties.forgeVersion
 
-    parchment {
-        def split = "${parchmentVersion}".split('-')
-        minecraftVersion = split[1]
-        mappingsVersion = split[0]
-    }
-
     mods {
-        create(project.name) {
+        create(modid) {
             sourceSet project.sourceSets.main
+        }
+        create('clickmachine_tests') {
+            sourceSet project.sourceSets.gametest
         }
     }
 
@@ -34,35 +51,57 @@ neoForge {
         configureEach {
             logLevel = org.slf4j.event.Level.DEBUG
             taskBefore generateModMetadata
+            loadedMods = [mods[modid]]
         }
 
         client {
             client()
-            systemProperty 'forge.enabledGameTestNamespaces', "${modid}"
+            systemProperty 'neoforge.enabledGameTestNamespaces', "${modid}"
+            gameDirectory = file('run-26.2/client')
             ideName = "${project.name} - Client"
         }
 
         server {
             server()
-            systemProperty 'forge.enabledGameTestNamespaces', "${modid}"
+            systemProperty 'neoforge.enabledGameTestNamespaces', "${modid}"
+            gameDirectory = file('run-26.2/server')
             programArgument '--nogui'
             ideName = "${project.name} - Server"
         }
 
         data {
-            data()
+            clientData()
+            gameDirectory = file('run-26.2/data')
             programArguments.addAll '--mod', "${modid}", '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
             ideName = "${project.name} - Data"
+        }
+
+        gameTestServer {
+            type = 'gameTestServer'
+            sourceSet = sourceSets.gametest
+            loadedMods = [mods[modid], mods.clickmachine_tests]
+            gameDirectory = file('run-26.2/gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'clickmachine_tests'
+            ideName = "${project.name} - Game Tests"
+        }
+
+        clientSmoke {
+            client()
+            sourceSet = sourceSets.gametest
+            loadedMods = [mods[modid], mods.clickmachine_tests]
+            gameDirectory = file('run-26.2/client-smoke')
+            programArguments.addAll '--quickPlaySingleplayer', 'Click Machine smoke'
+            systemProperty 'clickmachine.clientSmoke', 'true'
+            taskBefore prepareClientSmokeWorld
+            ideName = "${project.name} - Client Smoke Test"
         }
     }
 
     ideSyncTask generateModMetadata
 
-    neoFormRuntime {
-        useEclipseCompiler = false // Allows for parallelism on recompile - disabled due to a bug.
-        version = "1.0.21"
-    }
 }
+
+neoForge.addModdingDependenciesTo(sourceSets.gametest)
 
 repositories {
     maven {
@@ -114,8 +153,9 @@ configurations {
 }
 
 dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     if (project.mixin.toBoolean())                   annotationProcessor "org.spongepowered:mixin:${mixinVersion}:processor"
-    if (project.hasProperty('placeboVersion'))       implementation      "dev.shadowsoffire:Placebo:${mcVersion}-${placeboVersion}"
     if (project.hasProperty('jeiVersion'))           localImplementation "mezz.jei:jei-${mcVersion}-neoforge:${jeiVersion}"
     if (project.hasProperty('jadeVersion'))          localImplementation "snownee.jade:Jade-NeoForge:${mcVersion}-${jadeVersion}"
     if (project.hasProperty('curiosVersion'))        implementation      "top.theillusivec4.curios:curios-neoforge:${curiosVersion}"
@@ -125,6 +165,10 @@ dependencies {
     if (project.hasProperty('twilightFileId'))       localImplementation "curse.maven:the-twilight-forest-227639:${twilightFileId}"
     if (project.hasProperty('gatewaysVersion'))      localImplementation "dev.shadowsoffire:GatewaysToEternity:${mcVersion}-${gatewaysVersion}"
     if (project.hasProperty('attributeslibVersion')) implementation      "dev.shadowsoffire:ApothicAttributes:${mcVersion}-${attributeslibVersion}"
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
 }
 
 tasks.named("generateModMetadata") {
@@ -154,7 +198,6 @@ tasks.named("generateModMetadata") {
     }
     replaceProperties.put 'license', file('LICENSE').readLines().get(0)
 
-    if (project.hasProperty('placeboVersion'))       replaceProperties.put 'placeboVersion', placeboVersion
     if (project.hasProperty('attributeslibVersion')) replaceProperties.put 'attributeslibVersion', attributeslibVersion
     if (project.hasProperty('curiosVersion'))        replaceProperties.put 'curiosVersion', curiosVersion
     if (project.hasProperty('topVersion'))           replaceProperties.put 'topVersion', topVersion
@@ -165,7 +208,7 @@ tasks.named("generateModMetadata") {
     inputs.properties replaceProperties
 
     from("src/templates")
-    into("src/generated/resources")
+    into(layout.buildDirectory.dir('generated/sources/modMetadata'))
 
     filesMatching('neoforge.mods.toml') {
         expand replaceProperties
@@ -256,6 +299,8 @@ tasks.withType(Jar) {
 
 sourceSets.main.resources {
     srcDir 'src/generated/resources'
+    srcDir generateModMetadata
+    exclude '**/.cache/**'
 }
 
 // Declare an additional sourceset so un-expanded template files are visible in the IDE.
@@ -272,6 +317,7 @@ if (!project.enableTests.toBoolean()) {
 }
 
 tasks.named('jar', Jar).configure {
+    from('LICENSE')
     manifest {
         attributes([
             "Specification-Title": project.fileName,

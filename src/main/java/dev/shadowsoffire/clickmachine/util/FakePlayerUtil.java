@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import com.mojang.authlib.GameProfile;
 
@@ -27,9 +27,9 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.animal.horse.AbstractHorse;
+import net.minecraft.world.entity.animal.equine.AbstractHorse;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.level.ClipContext;
@@ -37,7 +37,7 @@ import net.minecraft.world.level.ClipContext.Block;
 import net.minecraft.world.level.ClipContext.Fluid;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.portal.DimensionTransition;
+import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
@@ -71,7 +71,7 @@ public class FakePlayerUtil {
         }
 
         @Override
-        public Entity changeDimension(DimensionTransition transition) {
+        public net.minecraft.server.level.ServerPlayer teleport(TeleportTransition transition) {
             return null;
         }
     }
@@ -92,16 +92,16 @@ public class FakePlayerUtil {
      * @param toHold    The stack the player will be using. Should probably come from an ItemStackHandler or similar.
      */
     public static void setupFakePlayerForUse(UsefulFakePlayer player, BlockPos pos, Direction direction, ItemStack toHold, boolean sneaking) {
-        player.getInventory().items.set(player.getInventory().selected, toHold);
+        player.getInventory().setItem(player.getInventory().getSelectedSlot(), toHold);
         float pitch = direction == Direction.UP ? -90 : direction == Direction.DOWN ? 90 : 0;
         float yaw = direction == Direction.SOUTH ? 0 : direction == Direction.WEST ? 90 : direction == Direction.NORTH ? 180 : -90;
-        Vec3i sideVec = direction.getNormal();
+        Vec3i sideVec = direction.getUnitVec3i();
         Axis a = direction.getAxis();
         AxisDirection ad = direction.getAxisDirection();
         double x = a == Axis.X && ad == AxisDirection.NEGATIVE ? -.5 : .5 + sideVec.getX() / 1.9D;
         double y = 0.5 + sideVec.getY() / 1.9D;
         double z = a == Axis.Z && ad == AxisDirection.NEGATIVE ? -.5 : .5 + sideVec.getZ() / 1.9D;
-        player.moveTo(pos.getX() + x, pos.getY() + y - player.getEyeHeight(), pos.getZ() + z, yaw, pitch);
+        player.snapTo(pos.getX() + x, pos.getY() + y - player.getEyeHeight(), pos.getZ() + z, yaw, pitch);
         if (!toHold.isEmpty()) {
             ItemAttributeModifiers modifiers = toHold.getAttributeModifiers();
             modifiers.forEach(EquipmentSlot.MAINHAND, (attr, modif) -> {
@@ -131,7 +131,7 @@ public class FakePlayerUtil {
                 }
             });
         }
-        player.getInventory().items.set(player.getInventory().selected, ItemStack.EMPTY);
+        player.getInventory().setItem(player.getInventory().getSelectedSlot(), ItemStack.EMPTY);
         stackCallback.accept(resultStack);
         if (!player.getInventory().isEmpty()) player.getInventory().dropAll();
         player.setShiftKeyDown(false);
@@ -153,15 +153,14 @@ public class FakePlayerUtil {
 
         ItemStack itemstack = player.getMainHandItem();
         if (toUse.getType() == HitResult.Type.ENTITY) {
-            if (processUseEntity(player, world, ((EntityHitResult) toUse).getEntity(), toUse, InteractionType.INTERACT_AT)) return player.getMainHandItem();
-            else if (processUseEntity(player, world, ((EntityHitResult) toUse).getEntity(), null, InteractionType.INTERACT)) return player.getMainHandItem();
+            if (processUseEntity(player, world, ((EntityHitResult) toUse).getEntity(), toUse, InteractionType.INTERACT)) return player.getMainHandItem();
         }
         else if (toUse.getType() == HitResult.Type.BLOCK) {
             BlockPos blockpos = ((BlockHitResult) toUse).getBlockPos();
             BlockState state = world.getBlockState(blockpos);
             if (state != sourceState && !state.isAir()) {
                 InteractionResult type = player.gameMode.useItemOn(player, world, itemstack, InteractionHand.MAIN_HAND, (BlockHitResult) toUse);
-                if (type == InteractionResult.SUCCESS) return player.getMainHandItem();
+                if (type.consumesAction()) return player.getMainHandItem();
             }
         }
 
@@ -201,7 +200,7 @@ public class FakePlayerUtil {
             BlockPos blockpos = ((BlockHitResult) toUse).getBlockPos();
             BlockState state = world.getBlockState(blockpos);
             if (state != sourceState && !state.isAir()) {
-                player.gameMode.handleBlockBreakAction(blockpos, Action.START_DESTROY_BLOCK, ((BlockHitResult) toUse).getDirection(), player.level().getMaxBuildHeight(), 0);
+                player.gameMode.handleBlockBreakAction(blockpos, Action.START_DESTROY_BLOCK, ((BlockHitResult) toUse).getDirection(), player.level().getMaxY(), 0);
                 return player.getMainHandItem();
             }
         }
@@ -210,7 +209,7 @@ public class FakePlayerUtil {
             for (int i = 1; i <= 5; i++) {
                 BlockState state = world.getBlockState(pos.relative(side, i));
                 if (state != sourceState && !state.isAir()) {
-                    player.gameMode.handleBlockBreakAction(pos.relative(side, i), Action.START_DESTROY_BLOCK, side.getOpposite(), player.level().getMaxBuildHeight(), 0);
+                    player.gameMode.handleBlockBreakAction(pos.relative(side, i), Action.START_DESTROY_BLOCK, side.getOpposite(), player.level().getMaxY(), 0);
                     return player.getMainHandItem();
                 }
             }
@@ -284,19 +283,17 @@ public class FakePlayerUtil {
      * @param player The player.
      * @param world  The world of the calling tile entity.
      * @param entity The entity to interact with.
-     * @param result The actual ray trace result, only necessary if using {@link CUseEntityPacket.Action#INTERACT_AT}
+     * @param result The actual ray trace result, only necessary if using an entity interaction
      * @param action The type of interaction to perform.
      * @return If the entity was used.
      */
     public static boolean processUseEntity(UsefulFakePlayer player, Level world, Entity entity, @Nullable HitResult result, InteractionType action) {
         if (entity != null) {
             if (player.distanceToSqr(entity) < 36) {
-                if (action == InteractionType.INTERACT) {
-                    return player.interactOn(entity, InteractionHand.MAIN_HAND) == InteractionResult.SUCCESS;
-                }
-                else if (action == InteractionType.INTERACT_AT) {
-                    if (CommonHooks.onInteractEntityAt(player, entity, result.getLocation(), InteractionHand.MAIN_HAND) != null) return false;
-                    return entity.interactAt(player, result.getLocation(), InteractionHand.MAIN_HAND) == InteractionResult.SUCCESS;
+                if (action == InteractionType.INTERACT || action == InteractionType.INTERACT_AT) {
+                    // 26.2 combines interact-at and interact into one vanilla interaction path.
+                    Vec3 hit = result == null ? Vec3.ZERO : result.getLocation().subtract(entity.position());
+                    return player.interactOn(entity, InteractionHand.MAIN_HAND, hit).consumesAction();
                 }
                 else if (action == InteractionType.ATTACK) {
                     if (entity instanceof ItemEntity || entity instanceof ExperienceOrb || entity instanceof Arrow || entity == player) return false;

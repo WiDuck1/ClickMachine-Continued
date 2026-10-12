@@ -9,14 +9,17 @@ import dev.shadowsoffire.clickmachine.ClickMachine;
 import dev.shadowsoffire.clickmachine.ClickMachineConfig;
 import dev.shadowsoffire.clickmachine.util.FakePlayerUtil;
 import dev.shadowsoffire.clickmachine.util.FakePlayerUtil.UsefulFakePlayer;
-import dev.shadowsoffire.placebo.block_entity.TickingBlockEntity;
-import dev.shadowsoffire.placebo.cap.ModifiableEnergyStorage;
-import dev.shadowsoffire.placebo.menu.SimpleDataSlots;
-import dev.shadowsoffire.placebo.menu.SimpleDataSlots.IDataAutoRegister;
+import dev.shadowsoffire.clickmachine.util.MachineEnergy;
+import dev.shadowsoffire.clickmachine.util.MachineInventory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.HolderLookup.Provider;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -26,18 +29,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.ItemStackHandler;
 
-public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack>, TickingBlockEntity, IDataAutoRegister {
+public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack> {
 
     public static final GameProfile DEFAULT_CLICKER = new GameProfile(UUID.fromString("36f373ac-29ef-4150-b664-e7e6006efcd8"), "[The Click Machine]");
 
-    protected final SimpleDataSlots data = new SimpleDataSlots();
-
-    protected ItemStackHandler held;
-    protected ModifiableEnergyStorage power = new ModifiableEnergyStorage(ClickMachineConfig.maxPowerStorage);
+    protected MachineInventory held;
+    protected final MachineEnergy power = new MachineEnergy(ClickMachineConfig.maxPowerStorage, this::setChanged);
     protected int speedIdx = 0;
     protected boolean sneak = false;
     protected boolean rightClick = true;
@@ -47,20 +45,10 @@ public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack>
     protected transient UsefulFakePlayer player;
 
     public ClickMachineTile(BlockPos pos, BlockState state) {
-        super(ClickMachine.CLICK_MACHINE_TILE, pos, state);
-        this.held = new ItemStackHandler(1){
-            @Override
-            public boolean isItemValid(int slot, ItemStack stack) {
-                return !ClickMachineConfig.blacklistedItems.contains(stack.getItem());
-            }
-        };
-        this.data.addEnergy(this.power);
-        this.data.addData(() -> this.speedIdx, v -> this.speedIdx = v);
-        this.data.addData(() -> this.sneak, v -> this.sneak = v);
-        this.data.addData(() -> this.rightClick, v -> this.rightClick = v);
+        super(ClickMachine.CLICK_MACHINE_TILE.get(), pos, state);
+        this.held = new MachineInventory(this::setChanged);
     }
 
-    @Override
     public void serverTick(Level level, BlockPos pos, BlockState state) {
         if (this.player == null) {
             this.player = FakePlayerUtil.createPlayer(level, this.profile != null ? this.profile : DEFAULT_CLICKER);
@@ -101,11 +89,11 @@ public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack>
         return this.player;
     }
 
-    public IItemHandler getHandler() {
+    public MachineInventory getHandler() {
         return this.held;
     }
 
-    public IEnergyStorage getEnergy() {
+    public MachineEnergy getEnergy() {
         return this.power;
     }
 
@@ -118,7 +106,7 @@ public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack>
     }
 
     public void setSpeedIndex(int speedIdx) {
-        this.speedIdx = speedIdx;
+        this.speedIdx = Math.clamp(speedIdx, 0, 8);
         this.setChanged();
     }
 
@@ -150,49 +138,66 @@ public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack>
     static final String tagEnergy = "fe";
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider regs) {
-        super.saveAdditional(tag, regs);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
         if (this.profile != null) {
-            tag.putUUID(tagUUID, this.profile.getId());
-            tag.putString(tagName, this.profile.getName());
+            output.store(tagUUID, UUIDUtil.CODEC, this.profile.id());
+            output.putString(tagName, this.profile.name());
         }
-        tag.put(tagHandler, this.held.serializeNBT(regs));
-        tag.putInt(tagCounter, this.counter % this.getSpeed());
-        this.writeSyncData(tag);
+        this.held.serialize(output.child(tagHandler));
+        output.putInt(tagCounter, this.counter % this.getSpeed());
+        this.writeSyncData(output);
     }
 
-    CompoundTag writeSyncData(CompoundTag tag) {
-        tag.putInt(tagSpeed, this.getSpeedIndex());
-        tag.putBoolean(tagSneak, this.sneak);
-        tag.putBoolean(tagRightClick, this.rightClick);
-        tag.putInt(tagEnergy, this.power.getEnergyStored());
-        return tag;
+    private void writeSyncData(ValueOutput output) {
+        output.putInt(tagSpeed, this.getSpeedIndex());
+        output.putBoolean(tagSneak, this.sneak);
+        output.putBoolean(tagRightClick, this.rightClick);
+        output.putInt(tagEnergy, this.power.getEnergyStored());
     }
 
-    void readSyncData(CompoundTag tag) {
-        this.setSpeedIndex(tag.getInt(tagSpeed));
-        this.sneak = tag.getBoolean(tagSneak);
-        this.rightClick = tag.getBoolean(tagRightClick);
-        this.setPower(tag.getInt(tagEnergy));
+    private void readSyncData(ValueInput input) {
+        this.setSpeedIndex(input.getIntOr(tagSpeed, 0));
+        this.sneak = input.getBooleanOr(tagSneak, false);
+        this.rightClick = input.getBooleanOr(tagRightClick, false);
+        this.setPower(input.getIntOr(tagEnergy, 0));
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, Provider regs) {
-        super.loadAdditional(tag, regs);
-        if (tag.contains(tagUUID) && tag.contains(tagName)) this.profile = new GameProfile(tag.getUUID(tagUUID), tag.getString(tagName));
-        if (tag.contains(tagHandler)) this.held.deserializeNBT(regs, tag.getCompound(tagHandler));
-        this.counter = tag.getInt(tagCounter);
-        this.readSyncData(tag);
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        input.read(tagUUID, UUIDUtil.CODEC).ifPresent(uuid -> {
+            this.profile = new GameProfile(uuid, input.getStringOr(tagName, DEFAULT_CLICKER.name()));
+        });
+        this.held.deserialize(input.childOrEmpty(tagHandler));
+        this.counter = input.getIntOr(tagCounter, 0);
+        this.readSyncData(input);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        var output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, registries);
+        writeSyncData(output);
+        return output.buildResult();
     }
 
     @Override
     public ClientboundBlockEntityDataPacket getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this, (be, regs) -> ((ClickMachineTile) be).writeSyncData(new CompoundTag()));
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override
-    public void onDataPacket(Connection net, ClientboundBlockEntityDataPacket pkt, HolderLookup.Provider regs) {
-        this.readSyncData(pkt.getTag());
+    public void onDataPacket(Connection connection, ValueInput input) { readSyncData(input); }
+
+    @Override
+    public void handleUpdateTag(ValueInput input) { readSyncData(input); }
+
+    @Override
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+        if (this.level != null && !this.level.isClientSide()) {
+            Block.popResource(this.level, pos, this.held.getStackInSlot(0));
+        }
+        super.preRemoveSideEffects(pos, state);
     }
 
     public int getPower() {
@@ -210,9 +215,19 @@ public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack>
         this.held.setStackInSlot(0, s);
     }
 
-    @Override
     public void registerSlots(Consumer<DataSlot> consumer) {
-        this.data.register(consumer);
+        consumer.accept(slot(this::getPower, this::setPower));
+        consumer.accept(slot(this::getSpeedIndex, this::setSpeedIndex));
+        consumer.accept(slot(() -> this.sneak ? 1 : 0, value -> this.sneak = value == 1));
+        consumer.accept(slot(() -> this.rightClick ? 1 : 0, value -> this.rightClick = value == 1));
     }
 
+    private static DataSlot slot(java.util.function.IntSupplier getter, java.util.function.IntConsumer setter) {
+        return new DataSlot() {
+            @Override
+            public int get() { return getter.getAsInt(); }
+            @Override
+            public void set(int value) { setter.accept(value); }
+        };
+    }
 }

@@ -1,17 +1,10 @@
 {
   "type": "minecraft:crafting_shaped",
-  "category": "misc",
   "group": "clickmachine",
   "key": {
-    "C": {
-      "item": "minecraft:chorus_flower"
-    },
-    "D": {
-      "item": "minecraft:diorite"
-    },
-    "S": {
-      "tag": "c:storage_blocks/redstone"
-    }
+    "C": "minecraft:chorus_flower",
+    "D": "minecraft:diorite",
+    "S": "#c:storage_blocks/redstone"
   },
   "pattern": [
     "DDD",
@@ -19,7 +12,6 @@
     "DSD"
   ],
   "result": {
-    "count": 1,
     "id": "clickmachine:click_machine"
   }
 }
