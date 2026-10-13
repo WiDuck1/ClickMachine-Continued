@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "clickmachine_tests",
+  "version": "1.0.0",
+  "name": "Click Machine regression tests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["dev.shadowsoffire.clickmachine.gametest.ClickMachineGameTests"],
+    "client": ["dev.shadowsoffire.clickmachine.gametest.ClientSmokeTest"],
+    "fabric-client-gametest": ["dev.shadowsoffire.clickmachine.gametest.FabricClientSmokeGameTest"]
+  },
+  "depends": { "clickmachine": "*" }
+}

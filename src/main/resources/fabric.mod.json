@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "clickmachine",
+  "version": "${version}",
+  "name": "Click Machine",
+  "description": "${desc}",
+  "authors": ["${author}"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["dev.shadowsoffire.clickmachine.ClickMachine"],
+    "client": ["dev.shadowsoffire.clickmachine.ClickMachineClient"],
+    "fabric-datagen": ["dev.shadowsoffire.clickmachine.data.ClickMachineDataGenerator"]
+  },
+  "mixins": ["clickmachine.mixins.json"],
+  "depends": {
+    "fabricloader": ">=${loaderVersion}",
+    "minecraft": "${mcVersion}",
+    "java": ">=25",
+    "fabric-api": ">=${fabricApiVersion}",
+    "team_reborn_energy": ">=5.0.0"
+  }
+}
