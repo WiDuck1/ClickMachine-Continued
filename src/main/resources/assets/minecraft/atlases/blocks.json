@@ -1,0 +1,7 @@
+{
+  "sources": [
+    { "type": "minecraft:single", "resource": "clickmachine:blocks/front" },
+    { "type": "minecraft:single", "resource": "clickmachine:blocks/front_off" },
+    { "type": "minecraft:single", "resource": "clickmachine:blocks/side" }
+  ]
+}
