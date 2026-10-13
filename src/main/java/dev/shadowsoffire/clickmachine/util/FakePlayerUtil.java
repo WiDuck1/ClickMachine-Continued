@@ -67,7 +67,7 @@ public class FakePlayerUtil {
                 public void send(Packet<?> packet) {}
             };
             this.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
-            this.setInvulnerable(true);
+            this.setPermanentlyInvulnerable(true);
             this.refreshDimensions();
         }
 
