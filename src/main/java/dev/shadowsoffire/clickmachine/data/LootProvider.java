@@ -2,43 +2,29 @@ package dev.shadowsoffire.clickmachine.data;
 
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 import dev.shadowsoffire.clickmachine.ClickMachine;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup.Provider;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.data.PackOutput;
 import net.minecraft.data.loot.BlockLootSubProvider;
 import net.minecraft.data.loot.LootTableProvider;
-import net.minecraft.resources.ResourceKey;
+import net.minecraft.data.loot.LootTableSubProvider;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 
 public class LootProvider extends LootTableProvider {
 
-    private LootProvider(PackOutput output, Set<ResourceKey<LootTable>> requiredTables, List<SubProviderEntry> subProviders, CompletableFuture<Provider> registries) {
-        super(output, requiredTables, subProviders, registries);
-    }
-
-    public static LootProvider create(PackOutput output, CompletableFuture<Provider> registries) {
-        return new LootProvider(
-            output,
-            Set.of(),
-            List.of(
-                new LootTableProvider.SubProviderEntry(BlockLoot::new, LootContextParamSets.BLOCK)),
-            registries);
+    public LootProvider() {
+        super(Set.of(), List.of(new SubProviderEntry(BlockLoot::new, LootContextParamSets.BLOCK)));
     }
 
     public static class BlockLoot extends BlockLootSubProvider {
 
         public static final Set<Item> EXPLOSION_RESISTANT = Set.of();
 
-        protected BlockLoot(Provider registries) {
-            super(EXPLOSION_RESISTANT, FeatureFlags.REGISTRY.allFlags(), registries);
+        protected BlockLoot(LootTableSubProvider.Context context) {
+            super(EXPLOSION_RESISTANT, FeatureFlags.REGISTRY.allFlags(), context);
         }
 
         @Override
@@ -48,7 +34,7 @@ public class LootProvider extends LootTableProvider {
 
         @Override
         protected Iterable<Block> getKnownBlocks() {
-            return BuiltInRegistries.BLOCK.listElements().filter(h -> h.getKey().identifier().getNamespace().equals(ClickMachine.MODID)).map(Holder::value).toList();
+            return List.of(ClickMachine.CLICK_MACHINE.get());
         }
 
         protected void dropSelf(Holder<Block> block) {

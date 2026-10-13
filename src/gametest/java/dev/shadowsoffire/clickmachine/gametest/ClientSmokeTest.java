@@ -1,11 +1,16 @@
 package dev.shadowsoffire.clickmachine.gametest;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.shadowsoffire.clickmachine.ClickMachine;
 import dev.shadowsoffire.clickmachine.block.ClickMachineBlock;
 import dev.shadowsoffire.clickmachine.block.ClickMachineTile;
 import dev.shadowsoffire.clickmachine.gui.ClickMachineMenu;
 import dev.shadowsoffire.clickmachine.gui.ClickMachineScreen;
+import dev.shadowsoffire.clickmachine.gui.SpeedSlider;
+import dev.shadowsoffire.clickmachine.gui.ClickerCheckboxButton;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -61,16 +66,31 @@ public final class ClientSmokeTest {
         var menu = screen.getMenu();
         if (!buttonsSent && menu.getEnergy() == 40000 && menu.getSlot(0).getItem().getCount() == 32) {
             buttonsSent = true;
-            client.gameMode.handleInventoryButtonClick(menu.containerId, 2);
-            client.gameMode.handleInventoryButtonClick(menu.containerId, 3);
-            client.gameMode.handleInventoryButtonClick(menu.containerId, 12);
+            for (var child : screen.children()) {
+                if (child instanceof ClickerCheckboxButton checkbox) {
+                    var click = mouse(checkbox.getX() + 10, checkbox.getY() + 10);
+                    if (!screen.mouseClicked(click, false)) throw new IllegalStateException("Checkbox did not accept left click");
+                    screen.mouseReleased(click);
+                }
+            }
+            var slider = screen.children().stream().filter(SpeedSlider.class::isInstance).map(SpeedSlider.class::cast).findFirst().orElseThrow();
+            var start = mouse(slider.getX() + 4, slider.getY() + 10);
+            var end = mouse(slider.getX() + slider.getWidth() - 4, slider.getY() + 10);
+            if (!screen.mouseClicked(start, false) || !screen.mouseDragged(end, end.x() - start.x(), 0)) {
+                throw new IllegalStateException("Speed slider did not accept left-button drag");
+            }
+            screen.mouseReleased(end);
         }
         if (buttonsSent && menu.isSneaking() && !menu.isRightClicking() && menu.getSpeedIdx() == 8 && menu.getEnergy() == 40000) {
             if (screen.children().size() != 3) throw new IllegalStateException("Expected the speed slider and two checkboxes");
             if (++renderedTicks == 40) {
-                ClickMachine.LOG.info("CLIENT SMOKE PASSED: menu rendered, inventory and 40000 RF synchronized, toggle and speed packets applied");
+                ClickMachine.LOG.info("CLIENT SMOKE PASSED: menu rendered, inventory and 40000 RF synchronized, checkbox clicks and speed-slider drag applied");
                 client.stop();
             }
         }
+    }
+
+    private static MouseButtonEvent mouse(double x, double y) {
+        return new MouseButtonEvent(x, y, new MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT, 0));
     }
 }

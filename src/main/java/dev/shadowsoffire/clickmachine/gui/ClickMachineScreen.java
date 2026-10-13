@@ -2,6 +2,7 @@ package dev.shadowsoffire.clickmachine.gui;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import dev.shadowsoffire.clickmachine.ClickMachine;
 import dev.shadowsoffire.clickmachine.ClickMachineConfig;
@@ -39,7 +40,7 @@ public class ClickMachineScreen extends AbstractContainerScreen<ClickMachineMenu
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
-        return this.getFocused() != null && this.isDragging() && event.button() == 0
+        return this.getFocused() != null && this.isDragging() && event.button() == InputConstants.MOUSE_BUTTON_LEFT
             ? this.getFocused().mouseDragged(event, dragX, dragY) : super.mouseDragged(event, dragX, dragY);
     }
 

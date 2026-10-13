@@ -11,6 +11,7 @@ import dev.shadowsoffire.clickmachine.data.LootProvider;
 import dev.shadowsoffire.clickmachine.gui.ClickMachineMenu;
 import dev.shadowsoffire.clickmachine.util.FakePlayerUtil.UsefulFakePlayer;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -26,7 +27,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
-import net.neoforged.neoforge.data.event.GatherDataEvent;
+import net.neoforged.neoforge.data.event.GatherDataRegistryEntriesEvent;
 import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
@@ -80,9 +81,9 @@ public class ClickMachine {
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) event.accept(CLICK_MACHINE_ITEM);
     }
 
-    private void data(GatherDataEvent.Client event) {
-        event.addProvider(new ClickRecipes.Runner(event.getGenerator().getPackOutput(), event.getLookupProvider()));
-        event.addProvider(LootProvider.create(event.getGenerator().getPackOutput(), event.getLookupProvider()));
+    private void data(GatherDataRegistryEntriesEvent event) {
+        event.add(RecipeProvider.asBootstrap(ClickRecipes::new));
+        event.add(Registries.LOOT_TABLE, new LootProvider());
     }
 
     public static Identifier loc(String path) {

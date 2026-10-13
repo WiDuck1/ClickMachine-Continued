@@ -11,6 +11,13 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(project.properties.javaVersion)
 
+def devRunDirectory = "run-${mcVersion}"
+
+// IntelliJ validates application working directories before running Gradle tasks.
+['client', 'server', 'data', 'gametest', 'client-smoke'].each {
+    mkdir("${devRunDirectory}/${it}")
+}
+
 sourceSets {
     gametest {
         compileClasspath += sourceSets.main.output
@@ -23,15 +30,15 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
 
 var prepareClientSmokeWorld = tasks.register('prepareClientSmokeWorld', Sync) {
     dependsOn 'runGameTestServer'
-    from 'run-26.2/gametest/gametestserver/gametestworld'
-    into 'run-26.2/client-smoke/saves/Click Machine smoke'
+    from "${devRunDirectory}/gametest/gametestserver/gametestworld"
+    into "${devRunDirectory}/client-smoke/saves/Click Machine smoke"
     exclude 'session.lock'
     doLast {
-        def config = file('run-26.2/client-smoke/config/clickmachine.cfg')
+        def config = file("${devRunDirectory}/client-smoke/config/clickmachine.cfg")
         config.parentFile.mkdirs()
         def usesRF = providers.gradleProperty('smokeUsesRF').getOrElse('true')
         config.text = file('src/main/resources/clickmachine-default.cfg').text.replace('B:"Uses RF"=false', 'B:"Uses RF"=' + usesRF)
-        file('run-26.2/client-smoke/options.txt').text = 'onboardAccessibility:false\n'
+        file("${devRunDirectory}/client-smoke/options.txt").text = 'onboardAccessibility:false\n'
     }
 }
 
@@ -57,21 +64,21 @@ neoForge {
         client {
             client()
             systemProperty 'neoforge.enabledGameTestNamespaces', "${modid}"
-            gameDirectory = file('run-26.2/client')
+            gameDirectory = file("${devRunDirectory}/client")
             ideName = "${project.name} - Client"
         }
 
         server {
             server()
             systemProperty 'neoforge.enabledGameTestNamespaces', "${modid}"
-            gameDirectory = file('run-26.2/server')
+            gameDirectory = file("${devRunDirectory}/server")
             programArgument '--nogui'
             ideName = "${project.name} - Server"
         }
 
         data {
             clientData()
-            gameDirectory = file('run-26.2/data')
+            gameDirectory = file("${devRunDirectory}/data")
             programArguments.addAll '--mod', "${modid}", '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
             ideName = "${project.name} - Data"
         }
@@ -80,7 +87,7 @@ neoForge {
             type = 'gameTestServer'
             sourceSet = sourceSets.gametest
             loadedMods = [mods[modid], mods.clickmachine_tests]
-            gameDirectory = file('run-26.2/gametest')
+            gameDirectory = file("${devRunDirectory}/gametest")
             systemProperty 'neoforge.enabledGameTestNamespaces', 'clickmachine_tests'
             ideName = "${project.name} - Game Tests"
         }
@@ -89,7 +96,7 @@ neoForge {
             client()
             sourceSet = sourceSets.gametest
             loadedMods = [mods[modid], mods.clickmachine_tests]
-            gameDirectory = file('run-26.2/client-smoke')
+            gameDirectory = file("${devRunDirectory}/client-smoke")
             programArguments.addAll '--quickPlaySingleplayer', 'Click Machine smoke'
             systemProperty 'clickmachine.clientSmoke', 'true'
             taskBefore prepareClientSmokeWorld
