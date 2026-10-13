@@ -21,7 +21,6 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.DataSlot;
@@ -187,12 +186,6 @@ public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack>
     }
 
     @Override
-    public void onDataPacket(Connection connection, ValueInput input) { readSyncData(input); }
-
-    @Override
-    public void handleUpdateTag(ValueInput input) { readSyncData(input); }
-
-    @Override
     public void preRemoveSideEffects(BlockPos pos, BlockState state) {
         if (this.level != null && !this.level.isClientSide()) {
             Block.popResource(this.level, pos, this.held.getStackInSlot(0));
@@ -216,10 +209,20 @@ public class ClickMachineTile extends BlockEntity implements Consumer<ItemStack>
     }
 
     public void registerSlots(Consumer<DataSlot> consumer) {
-        consumer.accept(slot(this::getPower, this::setPower));
+        // Vanilla menu packets carry signed shorts; transmit energy as two halves.
+        // Keep the speed/toggle data indices and all control IDs unchanged.
+        int[] syncedPower = { this.getPower() };
+        consumer.accept(slot(() -> this.getPower() & 0xFFFF, value -> {
+            syncedPower[0] = (syncedPower[0] & 0xFFFF0000) | (value & 0xFFFF);
+            this.setPower(syncedPower[0]);
+        }));
         consumer.accept(slot(this::getSpeedIndex, this::setSpeedIndex));
         consumer.accept(slot(() -> this.sneak ? 1 : 0, value -> this.sneak = value == 1));
         consumer.accept(slot(() -> this.rightClick ? 1 : 0, value -> this.rightClick = value == 1));
+        consumer.accept(slot(() -> this.getPower() >>> 16, value -> {
+            syncedPower[0] = (syncedPower[0] & 0xFFFF) | ((value & 0xFFFF) << 16);
+            this.setPower(syncedPower[0]);
+        }));
     }
 
     private static DataSlot slot(java.util.function.IntSupplier getter, java.util.function.IntConsumer setter) {

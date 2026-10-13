@@ -13,38 +13,82 @@ import net.minecraft.world.ItemStackWithSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
-import net.neoforged.neoforge.transfer.item.ItemResource;
-import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
+import net.fabricmc.fabric.api.transfer.v1.item.base.SingleStackStorage;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.player.Player;
 
 /** One slot with the original stack limit and save format. */
-public class MachineInventory extends ItemStacksResourceHandler {
+public class MachineInventory extends SingleStackStorage {
     private final Runnable changed;
 
     public MachineInventory(Runnable changed) {
-        super(1);
         this.changed = changed;
     }
 
-    public ItemStack getStackInSlot(int slot) { return stacks.get(slot); }
+    private ItemStack stack = ItemStack.EMPTY;
+
+    @Override
+    public int getSlotCount() { return 1; }
+    @Override
+    public MachineInventory getSlot(int slot) { checkSlot(slot); return this; }
+    @Override
+    protected ItemStack getStack() { return stack; }
+    @Override
+    protected void setStack(ItemStack stack) { this.stack = stack; }
+    @Override
+    protected void onFinalCommit() { changed.run(); }
+
+    public ItemStack getStackInSlot(int slot) { checkSlot(slot); return stack; }
+    private static void checkSlot(int slot) { if (slot != 0) throw new IndexOutOfBoundsException(slot); }
 
     public void setStackInSlot(int slot, ItemStack stack) {
-        set(slot, ItemResource.of(stack), stack.getCount());
+        checkSlot(slot);
+        this.stack = stack;
+        changed.run();
     }
 
     @Override
-    public boolean isValid(int slot, ItemResource resource) {
-        return !ClickMachineConfig.blacklistedItems.contains(resource.getItem());
-    }
-
+    protected boolean canInsert(ItemVariant resource) { return container.canPlaceItem(0, resource.toStack()); }
     @Override
-    protected int getCapacity(int slot, ItemResource resource) {
-        return resource.isEmpty() ? 64 : Math.min(64, resource.getMaxStackSize());
-    }
+    protected int getCapacity(ItemVariant resource) { return resource.isBlank() ? 64 : Math.min(64, super.getCapacity(resource)); }
 
-    @Override
-    protected void onContentsChanged(int slot, ItemStack previous) { changed.run(); }
+    private final Container container = new Container() {
+        @Override
+        public int getContainerSize() { return 1; }
+        @Override
+        public boolean isEmpty() { return stack.isEmpty(); }
+        @Override
+        public ItemStack getItem(int slot) { return getStackInSlot(slot); }
+        @Override
+        public ItemStack removeItem(int slot, int amount) {
+            checkSlot(slot);
+            ItemStack removed = stack.split(amount);
+            if (!removed.isEmpty()) changed.run();
+            return removed;
+        }
+        @Override
+        public ItemStack removeItemNoUpdate(int slot) {
+            checkSlot(slot);
+            ItemStack removed = stack;
+            stack = ItemStack.EMPTY;
+            return removed;
+        }
+        @Override
+        public void setItem(int slot, ItemStack item) { MachineInventory.this.setStackInSlot(slot, item); }
+        @Override
+        public void setChanged() { changed.run(); }
+        @Override
+        public boolean stillValid(Player player) { return true; }
+        @Override
+        public boolean canPlaceItem(int slot, ItemStack item) { return !ClickMachineConfig.blacklistedItems.contains(item.getItem()); }
+        @Override
+        public void clearContent() { MachineInventory.this.setStackInSlot(0, ItemStack.EMPTY); }
 
-    @Override
+    };
+
+    public Container asContainer() { return container; }
+
     public void serialize(ValueOutput output) {
         output.putInt("Size", 1);
         output.putInt("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
@@ -52,7 +96,6 @@ public class MachineInventory extends ItemStacksResourceHandler {
         if (!getStackInSlot(0).isEmpty()) items.add(new ItemStackWithSlot(0, getStackInSlot(0)));
     }
 
-    @Override
     public void deserialize(ValueInput input) {
         setStackInSlot(0, ItemStack.EMPTY);
         // Placebo's 1.21.1 inventory had no version marker, and Minecraft's world

@@ -1,122 +1,81 @@
 package dev.shadowsoffire.clickmachine;
 
-import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import dev.shadowsoffire.clickmachine.block.ClickMachineBlock;
 import dev.shadowsoffire.clickmachine.block.ClickMachineTile;
-import dev.shadowsoffire.clickmachine.data.ClickRecipes;
-import dev.shadowsoffire.clickmachine.data.LootProvider;
 import dev.shadowsoffire.clickmachine.gui.ClickMachineMenu;
-import dev.shadowsoffire.clickmachine.util.FakePlayerUtil.UsefulFakePlayer;
+import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.menu.v1.ExtendedMenuType;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
+import net.minecraft.core.Registry;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
-import net.neoforged.neoforge.data.event.GatherDataEvent;
-import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.OnDatapackSyncEvent;
-import net.neoforged.neoforge.event.entity.EntityEvent;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.registries.DeferredBlock;
-import net.neoforged.neoforge.registries.DeferredItem;
-import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import team.reborn.energy.api.EnergyStorage;
 
-@Mod(ClickMachine.MODID)
-public class ClickMachine {
+public class ClickMachine implements ModInitializer {
     public static final String MODID = "clickmachine";
     public static final Logger LOG = LogManager.getLogger(MODID);
-    private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
-    private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
-    private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, MODID);
-    private static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MODID);
+    public static final Supplier<ClickMachineBlock> CLICK_MACHINE = registerBlock();
+    public static final Supplier<BlockItem> CLICK_MACHINE_ITEM = registerItem();
+    public static final Supplier<BlockEntityType<ClickMachineTile>> CLICK_MACHINE_TILE = registerTile();
+    public static final Supplier<MenuType<ClickMachineMenu>> CLICK_MACHINE_MENU = registerMenu();
 
-    public static final DeferredBlock<ClickMachineBlock> CLICK_MACHINE = BLOCKS.registerBlock("click_machine", ClickMachineBlock::new);
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> CLICK_MACHINE_ITEM = ITEMS.registerSimpleBlockItem(CLICK_MACHINE);
-    public static final Supplier<BlockEntityType<ClickMachineTile>> CLICK_MACHINE_TILE = BLOCK_ENTITIES.register("click_machine",
-        () -> new BlockEntityType<>(ClickMachineTile::new, Set.of(CLICK_MACHINE.get())));
-    public static final Supplier<MenuType<ClickMachineMenu>> CLICK_MACHINE_MENU = MENUS.register("click_machine",
-        () -> IMenuTypeExtension.create((id, inv, buf) -> new ClickMachineMenu(id, inv, buf.readBlockPos())));
-
-    public ClickMachine(IEventBus bus) {
-        BLOCKS.register(bus);
-        ITEMS.register(bus);
-        BLOCK_ENTITIES.register(bus);
-        MENUS.register(bus);
-        bus.addListener(this::caps);
-        bus.addListener(this::network);
-        bus.addListener(this::creativeTab);
-        bus.addListener(this::data);
-        NeoForge.EVENT_BUS.register(new GameBusEvents());
+    private static Supplier<ClickMachineBlock> registerBlock() {
+        var key = ResourceKey.create(Registries.BLOCK, loc("click_machine"));
+        var block = Registry.register(BuiltInRegistries.BLOCK, key, new ClickMachineBlock(BlockBehaviour.Properties.of().setId(key)));
+        return () -> block;
     }
 
-    private void caps(RegisterCapabilitiesEvent event) {
-        event.registerBlockEntity(Capabilities.Energy.BLOCK, CLICK_MACHINE_TILE.get(), (be, side) -> be.getEnergy());
-        event.registerBlockEntity(Capabilities.Item.BLOCK, CLICK_MACHINE_TILE.get(), (be, side) -> be.getHandler());
+    private static Supplier<BlockItem> registerItem() {
+        var key = ResourceKey.create(Registries.ITEM, loc("click_machine"));
+        var item = Registry.register(BuiltInRegistries.ITEM, key, new BlockItem(CLICK_MACHINE.get(), new Item.Properties().setId(key).useBlockDescriptionPrefix()));
+        return () -> item;
     }
 
-    private void network(RegisterPayloadHandlersEvent event) {
-        event.registrar("1").playToClient(ClickMachineConfig.ConfigPayload.TYPE, ClickMachineConfig.ConfigPayload.CODEC,
-            (msg, ctx) -> ClickMachineConfig.apply(msg));
+    private static Supplier<BlockEntityType<ClickMachineTile>> registerTile() {
+        var type = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, loc("click_machine"),
+            FabricBlockEntityTypeBuilder.create(ClickMachineTile::new, CLICK_MACHINE.get()).build());
+        return () -> type;
     }
 
-    private void creativeTab(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) event.accept(CLICK_MACHINE_ITEM);
+    private static Supplier<MenuType<ClickMachineMenu>> registerMenu() {
+        MenuType<ClickMachineMenu> type = Registry.register(BuiltInRegistries.MENU, loc("click_machine"),
+            new ExtendedMenuType<>(ClickMachineMenu::new, BlockPos.STREAM_CODEC));
+        return () -> type;
     }
 
-    private void data(GatherDataEvent.Client event) {
-        event.addProvider(new ClickRecipes.Runner(event.getGenerator().getPackOutput(), event.getLookupProvider()));
-        event.addProvider(LootProvider.create(event.getGenerator().getPackOutput(), event.getLookupProvider()));
+    @Override
+    public void onInitialize() {
+        ItemStorage.SIDED.registerForBlockEntity((tile, side) -> tile.getHandler(), CLICK_MACHINE_TILE.get());
+        EnergyStorage.SIDED.registerForBlockEntity((tile, side) -> tile.getEnergy(), CLICK_MACHINE_TILE.get());
+        PayloadTypeRegistry.clientboundPlay().register(ClickMachineConfig.ConfigPayload.TYPE, ClickMachineConfig.ConfigPayload.CODEC);
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(output -> output.accept(CLICK_MACHINE_ITEM.get()));
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> ClickMachineConfig.reload());
+        ServerLifecycleEvents.SYNC_DATA_PACK_CONTENTS.register((player, joined) ->
+            ServerPlayNetworking.send(player, new ClickMachineConfig.ConfigPayload()));
+        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resources, success) -> {
+            if (success) {
+                ClickMachineConfig.reload();
+                for (var player : server.getPlayerList().getPlayers()) ServerPlayNetworking.send(player, new ClickMachineConfig.ConfigPayload());
+            }
+        });
     }
 
-    public static Identifier loc(String path) {
-        return Identifier.fromNamespaceAndPath(MODID, path);
-    }
-
-    private static class GameBusEvents {
-        @SubscribeEvent(priority = EventPriority.HIGHEST)
-        public void blockJoin(EntityJoinLevelEvent event) {
-            if (event.getEntity() instanceof UsefulFakePlayer) event.setCanceled(true);
-        }
-
-        @SubscribeEvent(priority = EventPriority.LOWEST)
-        public void dims(EntityEvent.Size event) {
-            if (event.getEntity() instanceof UsefulFakePlayer) event.setNewSize(event.getNewSize().withEyeHeight(0));
-        }
-
-        @SubscribeEvent
-        public void reloads(AddServerReloadListenersEvent event) {
-            event.addListener(loc("config"), new SimplePreparableReloadListener<Void>() {
-                @Override
-                protected Void prepare(ResourceManager resources, ProfilerFiller profiler) { return null; }
-                @Override
-                protected void apply(Void unused, ResourceManager resources, ProfilerFiller profiler) {
-                    ClickMachineConfig.reload();
-                }
-            });
-        }
-
-        @SubscribeEvent
-        public void sync(OnDatapackSyncEvent event) {
-            var payload = new ClickMachineConfig.ConfigPayload();
-            if (event.getPlayer() != null) PacketDistributor.sendToPlayer(event.getPlayer(), payload);
-            else PacketDistributor.sendToAllPlayers(payload);
-        }
-    }
+    public static Identifier loc(String path) { return Identifier.fromNamespaceAndPath(MODID, path); }
 }

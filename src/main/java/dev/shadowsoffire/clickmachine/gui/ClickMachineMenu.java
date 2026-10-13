@@ -9,7 +9,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.transfer.item.ResourceHandlerSlot;
 
 public class ClickMachineMenu extends AbstractContainerMenu {
     protected final ClickMachineTile tile;
@@ -22,7 +21,10 @@ public class ClickMachineMenu extends AbstractContainerMenu {
         }
         this.tile = machine;
         machine.registerSlots(this::addDataSlot);
-        this.addSlot(new ResourceHandlerSlot(machine.getHandler(), machine.getHandler()::set, 0, 8, 50));
+        this.addSlot(new Slot(machine.getHandler().asContainer(), 0, 8, 50) {
+            @Override
+            public boolean mayPlace(ItemStack stack) { return machine.getHandler().asContainer().canPlaceItem(0, stack); }
+        });
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 this.addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 114 + row * 18));

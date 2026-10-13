@@ -20,7 +20,8 @@ build
 # other
 eclipse
 run
-run-26.2
+run-26.*
+run-fabric-*
 src/generated/resources/.cache/
 logs
 .factorypath

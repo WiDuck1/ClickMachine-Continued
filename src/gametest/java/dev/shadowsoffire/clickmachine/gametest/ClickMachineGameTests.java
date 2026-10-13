@@ -11,17 +11,17 @@ import java.util.function.Consumer;
 import com.mojang.authlib.GameProfile;
 import dev.shadowsoffire.clickmachine.ClickMachine;
 import dev.shadowsoffire.clickmachine.ClickMachineConfig;
-import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.gametest.framework.FunctionGameTestInstance;
-import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
+import net.fabricmc.fabric.api.transfer.v1.transaction.Transaction;
+import team.reborn.energy.api.EnergyStorage;
+import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
@@ -36,74 +36,83 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
-import net.neoforged.neoforge.network.payload.AdvancedContainerSetDataPayload;
-import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.transfer.item.ItemResource;
-import net.neoforged.neoforge.transfer.transaction.Transaction;
 import dev.shadowsoffire.clickmachine.gui.ClickMachineMenu;
 
 /** Loaded only by runGameTestServer; never included in the released mod. */
-@Mod(ClickMachineGameTests.MODID)
 public class ClickMachineGameTests {
     public static final String MODID = "clickmachine_tests";
-    private static final DeferredRegister<Consumer<GameTestHelper>> FUNCTIONS = DeferredRegister.create(Registries.TEST_FUNCTION, MODID);
-    private static final List<String> NAMES = new ArrayList<>();
-
-    public ClickMachineGameTests(IEventBus bus) {
-        register("timing_and_energy", ClickMachineGameTests::timingAndEnergy);
-        register("redstone_and_starvation", ClickMachineGameTests::redstoneAndStarvation);
-        register("saved_state", ClickMachineGameTests::savedState);
-        register("legacy_enchanted_tool", ClickMachineGameTests::legacyEnchantedTool);
-        register("menu_and_comparator", ClickMachineGameTests::menuAndComparator);
-        register("automation", ClickMachineGameTests::automation);
-        register("right_click_placement", ClickMachineGameTests::rightClickPlacement);
-        register("left_click_breaking", ClickMachineGameTests::leftClickBreaking);
-        register("entity_attack_and_cleanup", ClickMachineGameTests::entityAttackAndCleanup);
-        register("recipe", ClickMachineGameTests::recipe);
-        register("facing_and_cooldowns", ClickMachineGameTests::facingAndCooldowns);
-        register("machine_drops", ClickMachineGameTests::machineDrops);
-        FUNCTIONS.register(bus);
-        bus.addListener(this::tests);
-    }
-
-    private static Identifier loc(String name) { return Identifier.fromNamespaceAndPath(MODID, name); }
-
-    private static void register(String name, Consumer<GameTestHelper> test) {
-        NAMES.add(name);
-        FUNCTIONS.register(name, () -> helper -> {
-            int[] speeds = ClickMachineConfig.speeds;
-            int[] costs = ClickMachineConfig.powerPerSpeed;
-            boolean usesRF = ClickMachineConfig.usesRF;
-            int max = ClickMachineConfig.maxPowerStorage;
-            Set<net.minecraft.world.item.Item> blacklist = ClickMachineConfig.blacklistedItems;
-            try {
-                ClickMachineConfig.speeds = ClickMachineConfig.DEFAULT_SPEEDS.clone();
-                ClickMachineConfig.powerPerSpeed = ClickMachineConfig.DEFAULT_COSTS.clone();
-                ClickMachineConfig.maxPowerStorage = 50000;
-                ClickMachineConfig.usesRF = false;
-                ClickMachineConfig.blacklistedItems = Set.of(Items.BEDROCK);
-                test.accept(helper);
-                helper.succeed();
-            } finally {
-                ClickMachineConfig.speeds = speeds;
-                ClickMachineConfig.powerPerSpeed = costs;
-                ClickMachineConfig.usesRF = usesRF;
-                ClickMachineConfig.maxPowerStorage = max;
-                ClickMachineConfig.blacklistedItems = blacklist;
-            }
-        });
-    }
-
-    private void tests(RegisterGameTestsEvent event) {
-        var environment = event.registerEnvironment(loc("environment"));
-        for (String name : NAMES) {
-            event.registerTest(loc(name), new FunctionGameTestInstance(ResourceKey.create(Registries.TEST_FUNCTION, loc(name)),
-                new TestData<>(environment, loc("empty"), 200, 0, true)));
+    private static void runTest(GameTestHelper helper, Consumer<GameTestHelper> test) {
+        int[] speeds = ClickMachineConfig.speeds;
+        int[] costs = ClickMachineConfig.powerPerSpeed;
+        boolean usesRF = ClickMachineConfig.usesRF;
+        int max = ClickMachineConfig.maxPowerStorage;
+        Set<net.minecraft.world.item.Item> blacklist = ClickMachineConfig.blacklistedItems;
+        try {
+            ClickMachineConfig.speeds = ClickMachineConfig.DEFAULT_SPEEDS.clone();
+            ClickMachineConfig.powerPerSpeed = ClickMachineConfig.DEFAULT_COSTS.clone();
+            ClickMachineConfig.maxPowerStorage = 50000;
+            ClickMachineConfig.usesRF = false;
+            ClickMachineConfig.blacklistedItems = Set.of(Items.BEDROCK);
+            test.accept(helper);
+            helper.succeed();
+        } finally {
+            ClickMachineConfig.speeds = speeds;
+            ClickMachineConfig.powerPerSpeed = costs;
+            ClickMachineConfig.usesRF = usesRF;
+            ClickMachineConfig.maxPowerStorage = max;
+            ClickMachineConfig.blacklistedItems = blacklist;
         }
+    }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void timing_and_energy(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::timingAndEnergy); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void redstone_and_starvation(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::redstoneAndStarvation); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void saved_state(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::savedState); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void legacy_enchanted_tool(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::legacyEnchantedTool); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void menu_and_comparator(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::menuAndComparator); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void automation_transfers(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::automation); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void right_click_placement(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::rightClickPlacement); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void left_click_breaking(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::leftClickBreaking); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void entity_attack_and_cleanup(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::entityAttackAndCleanup); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void crafting_recipe(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::recipe); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void facing_and_cooldowns(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::facingAndCooldowns); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void machine_drops(GameTestHelper helper) { runTest(helper, ClickMachineGameTests::machineDrops); }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void fake_player_owner_isolation(GameTestHelper helper) {
+        var owner = helper.makeMockServerPlayerInLevel();
+        var fake = new UsefulFakePlayer(helper.getLevel(), owner.getGameProfile());
+        helper.assertTrue(fake.getStats() != owner.getStats(), "machine stats are isolated from owner stats");
+        helper.assertTrue(fake.getAdvancements() != owner.getAdvancements(), "machine advancements are isolated from owner advancements");
+        helper.assertTrue(fake.gameMode.isSurvival() && !fake.getAbilities().instabuild, "fake player remains survival in creative worlds");
+        helper.assertTrue(helper.getLevel().getEntity(fake.getUUID()) != fake, "fake player is never inserted into the world");
+        var stat = net.minecraft.stats.Stats.ITEM_USED.get(Items.DIAMOND_PICKAXE);
+        int before = owner.getStats().getValue(stat);
+        fake.awardStat(stat, 1);
+        helper.assertValueEqual(owner.getStats().getValue(stat), before, "machine actions do not increment owner stats");
+        helper.succeed();
     }
 
     private static CountingMachine machine(GameTestHelper helper) {
@@ -113,6 +122,29 @@ public class ClickMachineGameTests {
         var tile = new CountingMachine(pos, state);
         helper.getLevel().setBlockEntity(tile);
         return tile;
+    }
+
+    @GameTest(structure = "clickmachine_tests:empty", maxTicks = 200)
+    public void large_energy_menu_sync(GameTestHelper helper) {
+        int previousMax = ClickMachineConfig.maxPowerStorage;
+        try {
+            ClickMachineConfig.maxPowerStorage = Integer.MAX_VALUE;
+            var tile = machine(helper);
+            List<DataSlot> slots = new ArrayList<>();
+            tile.registerSlots(slots::add);
+            for (int energy : new int[] { 40000, 65536, 100000, Integer.MAX_VALUE, 1, 0 }) {
+                tile.setPower(energy);
+                int low = (short) slots.get(0).get();
+                int high = (short) slots.get(4).get();
+                tile.setPower(0);
+                slots.get(0).set(low);
+                slots.get(4).set(high);
+                helper.assertValueEqual(tile.getPower(), energy, "configured energy capacities survive signed-short menu synchronization");
+            }
+            helper.succeed();
+        } finally {
+            ClickMachineConfig.maxPowerStorage = previousMax;
+        }
     }
 
     private static void tick(GameTestHelper helper, ClickMachineTile tile) {
@@ -213,6 +245,10 @@ public class ClickMachineGameTests {
         var tile = machine(helper);
         var player = helper.makeMockPlayer(GameType.SURVIVAL);
         var menu = new ClickMachineMenu(1, player.getInventory(), tile.getBlockPos());
+        helper.assertTrue(!menu.getSlot(0).mayPlace(new ItemStack(Items.BEDROCK)), "menu rejects blacklisted items");
+        player.getInventory().setItem(9, new ItemStack(Items.BEDROCK));
+        helper.assertTrue(menu.quickMoveStack(player, 1).isEmpty(), "shift click rejects blacklisted items");
+        player.getInventory().setItem(9, ItemStack.EMPTY);
         tile.getHandler().setStackInSlot(0, new ItemStack(Items.COBBLESTONE, 64));
         menu.quickMoveStack(player, 0);
         helper.assertTrue(tile.getHandler().getStackInSlot(0).isEmpty(), "shift click removes held stack");
@@ -229,11 +265,15 @@ public class ClickMachineGameTests {
         List<DataSlot> slots = new ArrayList<>();
         tile.registerSlots(slots::add);
         helper.assertValueEqual(slots.getFirst().get(), 50000, "energy data has full integer precision");
-        var buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), helper.getLevel().registryAccess());
-        try {
-            AdvancedContainerSetDataPayload.STREAM_CODEC.encode(buf, new AdvancedContainerSetDataPayload((byte) 1, (short) 0, 50000));
-            helper.assertValueEqual(AdvancedContainerSetDataPayload.STREAM_CODEC.decode(buf).value(), 50000, "NeoForge menu packet retains full energy value");
-        } finally { buf.release(); }
+        for (int energy : new int[] { 40000, 50000, 0, 32768 }) {
+            tile.setPower(energy);
+            int low = (short) slots.get(0).get();
+            int high = (short) slots.get(4).get();
+            tile.setPower(0);
+            slots.get(0).set(low);
+            slots.get(4).set(high);
+            helper.assertValueEqual(tile.getPower(), energy, "vanilla signed-short menu packets retain full energy value");
+        }
         tile.getHandler().setStackInSlot(0, new ItemStack(Items.COBBLESTONE, 32));
         helper.assertValueEqual(tile.getBlockState().getAnalogOutputSignal(helper.getLevel(), tile.getBlockPos(), Direction.NORTH), 7, "stack comparator output");
         ItemStack tool = new ItemStack(Items.DIAMOND_PICKAXE);
@@ -246,16 +286,16 @@ public class ClickMachineGameTests {
     private static void automation(GameTestHelper helper) {
         var tile = machine(helper);
         for (Direction side : Direction.values()) {
-            helper.assertTrue(helper.getLevel().getCapability(Capabilities.Item.BLOCK, tile.getBlockPos(), side) == tile.getHandler(), "item capability on " + side);
-            helper.assertTrue(helper.getLevel().getCapability(Capabilities.Energy.BLOCK, tile.getBlockPos(), side) == tile.getEnergy(), "energy capability on " + side);
+            helper.assertTrue(ItemStorage.SIDED.find(helper.getLevel(), tile.getBlockPos(), side) == tile.getHandler(), "item storage on " + side);
+            helper.assertTrue(EnergyStorage.SIDED.find(helper.getLevel(), tile.getBlockPos(), side) == tile.getEnergy(), "energy storage on " + side);
         }
-        try (var transaction = Transaction.openRoot()) {
-            helper.assertValueEqual(tile.getHandler().insert(0, ItemResource.of(Items.BEDROCK), 1, transaction), 0, "blacklist rejects insertion");
-            helper.assertValueEqual(tile.getHandler().insert(0, ItemResource.of(Items.COBBLESTONE), 100, transaction), 64, "original stack limit");
+        try (var transaction = Transaction.openOuter()) {
+            helper.assertValueEqual(tile.getHandler().insert(ItemVariant.of(Items.BEDROCK), 1, transaction), 0L, "blacklist rejects insertion");
+            helper.assertValueEqual(tile.getHandler().insert(ItemVariant.of(Items.COBBLESTONE), 100, transaction), 64L, "original stack limit");
         }
         helper.assertTrue(tile.getHandler().getStackInSlot(0).isEmpty(), "aborted transfer changes nothing");
-        try (var transaction = Transaction.openRoot()) {
-            tile.getHandler().insert(0, ItemResource.of(Items.COBBLESTONE), 64, transaction);
+        try (var transaction = Transaction.openOuter()) {
+            tile.getHandler().insert(ItemVariant.of(Items.COBBLESTONE), 64, transaction);
             transaction.commit();
         }
         helper.assertValueEqual(tile.getHandler().getStackInSlot(0).getCount(), 64, "committed transfer persists");

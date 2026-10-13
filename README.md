@@ -1,14 +1,14 @@
 # ClickMachine Continued
 
-A Minecraft 26.2 mod for NeoForge 26.2 that adds a configurable automatic clicker block. Placebo is no longer required.
+A Minecraft 26.2 mod for Fabric that adds a configurable automatic clicker block. Placebo is no longer required.
 
 ## Run in IntelliJ IDEA
 
 1. Open this folder as a Gradle project and let Gradle finish syncing.
 2. Set the project SDK and Gradle JVM to **Java 25**. Gradle uses the included wrapper.
-3. Select **Click Machine - Client** in the run configuration dropdown and press **Run**.
+3. Select **Click Machine - Fabric 26.2 Playtest** in the run configuration dropdown and press **Run**.
 
-The configuration runs Gradle's `runClient` task, which launches a development Minecraft client with Click Machine. The game stores settings and worlds in `run-26.2/client/`, which is excluded from Git. The old `run/` folder is preserved separately.
+The configuration runs Gradle's `runClient` task, which launches a development Minecraft client with Click Machine. The game stores settings and worlds in `run-fabric-26.2/client/`, which is excluded from Git. Development folders for NeoForge are preserved separately.
 
 Create a Creative world and find **Click Machine** in the Redstone Blocks tab to try the mod.
 
@@ -28,7 +28,9 @@ On Windows, use `gradlew.bat runClient`.
 ./gradlew build
 ```
 
-The mod JAR is written to `build/libs/`. Install the JAR with Minecraft **26.2**, NeoForge **26.2.0.90 or newer in the 26.2 series**, and Java **25**.
+The mod JAR is written to `build/libs/ClickMachine-Fabric-26.2-9.0.1.jar`. Install the JAR with Minecraft **26.2**, Fabric Loader **0.19.5 or newer**, Fabric API **0.161.0+26.2 or newer for 26.2**, and Java **25**.
+
+The same JAR is installed on the server and all clients. The Fabric energy API is bundled; Placebo is not required.
 
 ## Configuration and behavior
 
@@ -51,9 +53,9 @@ Registry names, the crafting recipe, comparator output, control IDs, and block-e
 ./gradlew runClientSmoke
 ```
 
-Unit tests cover the existing configuration format and invalid values. The isolated GameTest mod checks gameplay, persistence, menus, automation, and crafting in `run-26.2/gametest/`. Test classes and resources are excluded from the released mod JAR.
+Unit tests cover the existing configuration format and invalid values. Server tests also check fake-player data isolation and normal item consumption/durability in Creative worlds. The isolated GameTest mod checks gameplay, persistence, menus, automation, and crafting in `run-fabric-26.2/gametest/`. Test classes and resources are excluded from the released mod JAR.
 
-`runClientSmoke` prepares a disposable copy of the GameTest world, opens the real client menu, verifies inventory, RF, toggles, and speed synchronization, then closes the client. Use `./gradlew runClientSmoke -PsmokeUsesRF=false` to check the rainbow-power rendering too.
+`runClientSmoke` creates a fresh disposable world, opens the real client menu, verifies inventory, full energy values, checkbox clicks, and slider dragging, then closes the client. Screenshots are saved in `build/run/clientGameTest/screenshots/`. Use `./gradlew runClientSmoke -PsmokeUsesRF=false` to check the rainbow-power rendering too.
 
 ## License
 

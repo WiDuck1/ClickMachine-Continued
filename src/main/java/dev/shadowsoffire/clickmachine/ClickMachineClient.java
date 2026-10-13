@@ -1,16 +1,15 @@
 package dev.shadowsoffire.clickmachine;
 
 import dev.shadowsoffire.clickmachine.gui.ClickMachineScreen;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.gui.screens.MenuScreens;
 
-@EventBusSubscriber(modid = ClickMachine.MODID, value = Dist.CLIENT)
-public class ClickMachineClient {
-
-    @SubscribeEvent
-    public static void setup(RegisterMenuScreensEvent e) {
-        e.register(ClickMachine.CLICK_MACHINE_MENU.get(), ClickMachineScreen::new);
+public class ClickMachineClient implements ClientModInitializer {
+    @Override
+    public void onInitializeClient() {
+        MenuScreens.register(ClickMachine.CLICK_MACHINE_MENU.get(), ClickMachineScreen::new);
+        ClientPlayNetworking.registerGlobalReceiver(ClickMachineConfig.ConfigPayload.TYPE,
+            (payload, context) -> ClickMachineConfig.apply(payload));
     }
 }

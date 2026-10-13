@@ -5,7 +5,10 @@ import dev.shadowsoffire.clickmachine.ClickMachine;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.SimpleMenuProvider;
+import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -16,7 +19,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
@@ -52,7 +54,7 @@ public class ClickMachineBlock extends Block implements EntityBlock {
     }
 
     @Override
-    public BlockState rotate(BlockState state, LevelAccessor world, BlockPos pos, Rotation direction) {
+    public BlockState rotate(BlockState state, Rotation direction) {
         return state.setValue(FACING, direction.rotate(state.getValue(FACING)));
     }
 
@@ -81,9 +83,19 @@ public class ClickMachineBlock extends Block implements EntityBlock {
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult) {
         if (level.isClientSide()) return InteractionResult.SUCCESS;
-        player.openMenu(new SimpleMenuProvider((id, inv, owner) -> new ClickMachineMenu(id, inv, pos),
-            Component.translatable(this.getDescriptionId())), buf -> buf.writeBlockPos(pos));
+        player.openMenu(menuProvider(pos));
         return InteractionResult.CONSUME;
+    }
+
+    public static ExtendedMenuProvider<BlockPos> menuProvider(BlockPos pos) {
+        return new ExtendedMenuProvider<>() {
+            @Override
+            public BlockPos getScreenOpeningData(ServerPlayer player) { return pos; }
+            @Override
+            public Component getDisplayName() { return Component.translatable("block.clickmachine.click_machine"); }
+            @Override
+            public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) { return new ClickMachineMenu(id, inventory, pos); }
+        };
     }
 
     @Override

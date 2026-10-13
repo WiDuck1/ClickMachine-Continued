@@ -17,7 +17,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
-import net.neoforged.fml.loading.FMLPaths;
+import net.fabricmc.loader.api.FabricLoader;
 
 public final class ClickMachineConfig {
     public static final int[] DEFAULT_SPEEDS = { 500, 200, 100, 50, 20, 10, 5, 2, 1 };
@@ -29,7 +29,7 @@ public final class ClickMachineConfig {
     public static Set<Item> blacklistedItems = Set.of();
 
     public static void reload() {
-        var file = FMLPaths.CONFIGDIR.get().resolve("clickmachine.cfg");
+        var file = FabricLoader.getInstance().getConfigDir().resolve("clickmachine.cfg");
         try {
             if (!Files.exists(file)) {
                 Files.createDirectories(file.getParent());

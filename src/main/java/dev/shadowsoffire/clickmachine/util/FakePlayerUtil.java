@@ -31,7 +31,6 @@ import net.minecraft.world.entity.animal.equine.AbstractHorse;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.ClipContext.Block;
 import net.minecraft.world.level.ClipContext.Fluid;
@@ -43,19 +42,51 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.CommonHooks;
-import net.neoforged.neoforge.common.util.FakePlayer;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ClientInformation;
+import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.chat.Component;
+import net.minecraft.stats.Stat;
+import net.minecraft.world.damagesource.DamageSource;
 
 public class FakePlayerUtil {
 
-    public static class UsefulFakePlayer extends FakePlayer {
+    public static class UsefulFakePlayer extends ServerPlayer {
 
         public UsefulFakePlayer(Level world, GameProfile name) {
-            super((ServerLevel) world, name);
+            super(((ServerLevel) world).getServer(), (ServerLevel) world, name, ClientInformation.createDefault());
+            this.connection = new ServerGamePacketListenerImpl(((ServerLevel) world).getServer(),
+                new net.minecraft.network.Connection(PacketFlow.SERVERBOUND), this, CommonListenerCookie.createInitial(name, false)) {
+                @Override
+                public void send(Packet<?> packet) {}
+            };
+            this.gameMode.changeGameModeForPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+            this.setInvulnerable(true);
+            this.refreshDimensions();
         }
 
         @Override
         public void initInventoryMenu() {}
+        @Override
+        public EntityDimensions getDefaultDimensions(Pose pose) { return super.getDefaultDimensions(pose).withEyeHeight(0); }
+        @Override
+        public void sendSystemMessage(Component message, boolean actionBar) {}
+        @Override
+        public void awardStat(Stat<?> stat, int amount) {}
+        @Override
+        public boolean canHarmPlayer(Player player) { return false; }
+        @Override
+        public void die(DamageSource source) {}
+        @Override
+        public void tick() {}
+        @Override
+        public boolean startRiding(Entity entity, boolean force, boolean sendEventAndTriggers) { return false; }
 
         @Override
         public void openHorseInventory(AbstractHorse horse, Container container) {}
@@ -103,8 +134,7 @@ public class FakePlayerUtil {
         double z = a == Axis.Z && ad == AxisDirection.NEGATIVE ? -.5 : .5 + sideVec.getZ() / 1.9D;
         player.snapTo(pos.getX() + x, pos.getY() + y - player.getEyeHeight(), pos.getZ() + z, yaw, pitch);
         if (!toHold.isEmpty()) {
-            ItemAttributeModifiers modifiers = toHold.getAttributeModifiers();
-            modifiers.forEach(EquipmentSlot.MAINHAND, (attr, modif) -> {
+            toHold.forEachModifier(EquipmentSlot.MAINHAND, (attr, modif) -> {
                 AttributeInstance inst = player.getAttribute(attr);
                 if (inst != null) {
                     inst.addOrUpdateTransientModifier(modif);
@@ -123,8 +153,7 @@ public class FakePlayerUtil {
      */
     public static void cleanupFakePlayerFromUse(UsefulFakePlayer player, ItemStack resultStack, ItemStack oldStack, Consumer<ItemStack> stackCallback) {
         if (!oldStack.isEmpty()) {
-            ItemAttributeModifiers modifiers = oldStack.getAttributeModifiers();
-            modifiers.forEach(EquipmentSlot.MAINHAND, (attr, modif) -> {
+            oldStack.forEachModifier(EquipmentSlot.MAINHAND, (attr, modif) -> {
                 AttributeInstance inst = player.getAttribute(attr);
                 if (inst != null) {
                     inst.removeModifier(modif);
@@ -141,7 +170,7 @@ public class FakePlayerUtil {
      * Uses whatever the player happens to be holding in the given direction.
      * 
      * @param player      The player.
-     * @param world       The world of the calling tile entity. It may be a bad idea to use {@link FakePlayer#getEntityWorld()}.
+     * @param world       The world of the calling tile entity. It may be a bad idea to use {@link ServerPlayer#level()}.
      * @param pos         The pos of the calling tile entity.
      * @param side        The direction to use in.
      * @param sourceState The state of the calling tile entity, so we don't click ourselves.
@@ -174,7 +203,6 @@ public class FakePlayerUtil {
             }
         }
 
-        if (itemstack.isEmpty() && (toUse == null || toUse.getType() == HitResult.Type.MISS)) CommonHooks.onEmptyClick(player, InteractionHand.MAIN_HAND);
         if (!itemstack.isEmpty()) player.gameMode.useItem(player, world, itemstack, InteractionHand.MAIN_HAND);
         return player.getMainHandItem();
     }
@@ -183,7 +211,7 @@ public class FakePlayerUtil {
      * Attacks with whatever the player happens to be holding in the given direction.
      * 
      * @param player      The player.
-     * @param world       The world of the calling tile entity. It may be a bad idea to use {@link FakePlayer#getEntityWorld()}.
+     * @param world       The world of the calling tile entity. It may be a bad idea to use {@link ServerPlayer#level()}.
      * @param pos         The pos of the calling tile entity.
      * @param side        The direction to attack in.
      * @param sourceState The state of the calling tile entity, so we don't click ourselves.
@@ -250,7 +278,7 @@ public class FakePlayerUtil {
                 double d3 = base.distanceTo(optVec.get());
 
                 if (d3 < d2 || d2 == 0.0D) {
-                    if (entity1.getRootVehicle() == player.getRootVehicle() && !entity1.canRiderInteract()) {
+                    if (entity1.getRootVehicle() == player.getRootVehicle()) {
                         if (d2 == 0.0D) {
                             pointedEntity = entity1;
                             vec3d3 = optVec.get();

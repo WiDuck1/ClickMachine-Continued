@@ -1,8 +1,0 @@
-modLoader="javafml"
-loaderVersion="[2,)"
-license="MIT"
-
-[[mods]]
-modId="clickmachine_tests"
-version="1"
-displayName="Click Machine regression tests"
