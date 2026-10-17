@@ -24,7 +24,7 @@ import team.reborn.energy.api.EnergyStorage;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.item.ItemStack;
@@ -112,6 +112,15 @@ public class ClickMachineGameTests {
         int before = owner.getStats().getValue(stat);
         fake.awardStat(stat, 1);
         helper.assertValueEqual(owner.getStats().getValue(stat), before, "machine actions do not increment owner stats");
+        var manager = helper.getLevel().getServer().getAdvancements();
+        var advancement = manager.get(net.minecraft.resources.Identifier.withDefaultNamespace("story/mine_stone"));
+        var criterion = advancement.value().criteria().keySet().iterator().next();
+        boolean ownerHadProgress = owner.getAdvancements().getOrStartProgress(advancement).hasProgress();
+        fake.getAdvancements().reload(manager);
+        helper.assertTrue(!fake.getAdvancements().award(advancement, criterion), "machine advancement awards remain disabled after reload");
+        helper.assertTrue(!fake.getAdvancements().getOrStartProgress(advancement).hasProgress(), "machine advancements remain empty");
+        helper.assertTrue(owner.getAdvancements().getOrStartProgress(advancement).hasProgress() == ownerHadProgress,
+            "machine actions do not change owner advancements");
         helper.succeed();
     }
 
@@ -330,7 +339,7 @@ public class ClickMachineGameTests {
         tile.setRightClicking(false);
         ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
         tile.getHandler().setStackInSlot(0, sword);
-        var cow = EntityTypes.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        var cow = EntityType.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
         cow.setNoAi(true);
         cow.snapTo(tile.getBlockPos().getX() + 2.5, tile.getBlockPos().getY(), tile.getBlockPos().getZ() + 0.5, 0, 0);
         helper.getLevel().addFreshEntity(cow);

@@ -319,7 +319,7 @@ public class FakePlayerUtil {
         if (entity != null) {
             if (player.distanceToSqr(entity) < 36) {
                 if (action == InteractionType.INTERACT || action == InteractionType.INTERACT_AT) {
-                    // 26.2 combines interact-at and interact into one vanilla interaction path.
+                    // Vanilla combines interact-at and interact into one interaction path.
                     Vec3 hit = result == null ? Vec3.ZERO : result.getLocation().subtract(entity.position());
                     return player.interactOn(entity, InteractionHand.MAIN_HAND, hit).consumesAction();
                 }

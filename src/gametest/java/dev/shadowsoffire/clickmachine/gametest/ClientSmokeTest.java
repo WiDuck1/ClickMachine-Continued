@@ -57,7 +57,7 @@ public final class ClientSmokeTest implements ClientModInitializer {
                 player.openMenu(ClickMachineBlock.menuProvider(pos));
             });
         }
-        if (!(client.gui.screen() instanceof ClickMachineScreen screen)) return;
+        if (!(client.screen instanceof ClickMachineScreen screen)) return;
         var menu = screen.getMenu();
         if (!buttonsSent && menu.getEnergy() == 40000 && menu.getSlot(0).getItem().getCount() == 32) {
             buttonsSent = true;

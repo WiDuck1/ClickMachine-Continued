@@ -8,7 +8,7 @@ public class FabricClientSmokeGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         try (var world = context.worldBuilder().create()) {
-            world.getConnection().waitForChunksRender();
+            world.getClientLevel().waitForChunksRender();
             context.waitFor(client -> ClientSmokeTest.passed, 1200);
             context.takeScreenshot("click-machine-menu");
         }
