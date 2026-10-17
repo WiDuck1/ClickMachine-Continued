@@ -1,6 +1,6 @@
 # ClickMachine Continued
 
-A Minecraft 26.2 mod for NeoForge 26.2 that adds a configurable automatic clicker block. Placebo is no longer required.
+A Minecraft 26.1.2 mod for NeoForge 26.1.2 that adds a configurable automatic clicker block. Placebo is no longer required.
 
 ## Run in IntelliJ IDEA
 
@@ -8,7 +8,7 @@ A Minecraft 26.2 mod for NeoForge 26.2 that adds a configurable automatic clicke
 2. Set the project SDK and Gradle JVM to **Java 25**. Gradle uses the included wrapper.
 3. Select **Click Machine - Client** in the run configuration dropdown and press **Run**.
 
-The configuration runs Gradle's `runClient` task, which launches a development Minecraft client with Click Machine. The game stores settings and worlds in `run-26.2/client/`, which is excluded from Git. The old `run/` folder is preserved separately.
+The configuration runs Gradle's `runClient` task, which launches a development Minecraft client with Click Machine. The game stores settings and worlds in `run-26.1.2/client/`, which is excluded from Git. The old `run/` folder is preserved separately.
 
 Create a Creative world and find **Click Machine** in the Redstone Blocks tab to try the mod.
 
@@ -28,7 +28,7 @@ On Windows, use `gradlew.bat runClient`.
 ./gradlew build
 ```
 
-The mod JAR is written to `build/libs/`. Install the JAR with Minecraft **26.2**, NeoForge **26.2.0.90 or newer in the 26.2 series**, and Java **25**.
+The mod JAR is written to `build/libs/ClickMachine-26.1.2-9.0.1.jar`. Install the JAR with Minecraft **26.1.2**, NeoForge **26.1.2.122 or newer in the 26.1.2 series**, and Java **25**.
 
 ## Configuration and behavior
 
@@ -47,11 +47,12 @@ Registry names, the crafting recipe, comparator output, control IDs, and block-e
 ```sh
 ./gradlew test
 ./gradlew runGameTestServer
-./gradlew runData build
+./gradlew runData
+./gradlew build
 ./gradlew runClientSmoke
 ```
 
-Unit tests cover the existing configuration format and invalid values. The isolated GameTest mod checks gameplay, persistence, menus, automation, and crafting in `run-26.2/gametest/`. Test classes and resources are excluded from the released mod JAR.
+Unit tests cover the existing configuration format and invalid values. The isolated GameTest mod checks gameplay, persistence, menus, automation, and crafting in `run-26.1.2/gametest/`. Test classes and resources are excluded from the released mod JAR.
 
 `runClientSmoke` prepares a disposable copy of the GameTest world, opens the real client menu, verifies inventory, RF, toggles, and speed synchronization, then closes the client. Use `./gradlew runClientSmoke -PsmokeUsesRF=false` to check the rainbow-power rendering too.
 

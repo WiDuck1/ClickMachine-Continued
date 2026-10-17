@@ -57,7 +57,7 @@ public final class ClientSmokeTest {
                     Component.translatable("block.clickmachine.click_machine")), buf -> buf.writeBlockPos(pos));
             });
         }
-        if (!(client.gui.screen() instanceof ClickMachineScreen screen)) return;
+        if (!(client.screen instanceof ClickMachineScreen screen)) return;
         var menu = screen.getMenu();
         if (!buttonsSent && menu.getEnergy() == 40000 && menu.getSlot(0).getItem().getCount() == 32) {
             buttonsSent = true;

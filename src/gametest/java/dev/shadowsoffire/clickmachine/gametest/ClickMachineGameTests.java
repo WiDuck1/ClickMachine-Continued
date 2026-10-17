@@ -24,7 +24,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.item.ItemStack;
@@ -290,7 +290,7 @@ public class ClickMachineGameTests {
         tile.setRightClicking(false);
         ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
         tile.getHandler().setStackInSlot(0, sword);
-        var cow = EntityTypes.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
+        var cow = EntityType.COW.create(helper.getLevel(), EntitySpawnReason.TRIGGERED);
         cow.setNoAi(true);
         cow.snapTo(tile.getBlockPos().getX() + 2.5, tile.getBlockPos().getY(), tile.getBlockPos().getZ() + 0.5, 0, 0);
         helper.getLevel().addFreshEntity(cow);
